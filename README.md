@@ -1,4 +1,16 @@
-# GSAPort — experimental iOS 8 fork
+# GSAPort — iOS 8 fork
+
+**Tested and verified: iCloud sign-in on a jailbroken iPad 4 running iOS 8.4.1**, using GSAPort `2.4.2+ios8.4`, including a manually generated trusted-device verification code. This verifies account sign-in; individual iCloud services and other devices or iOS versions have not all been tested.
+
+## Relationship to iTunesStoreX
+
+GSAPort restored iCloud sign-in on the test device **before iTunesStoreX was installed**, so iTunesStoreX was not needed for that successful iCloud login. App Store login still failed with GSAPort alone.
+
+[The iOS 8 iTunesStoreX fork](https://github.com/kevinchan-dev/iTunesStoreX) `3.1+ios8.1` subsequently restored App Store sign-in on the same iPad, with GSAPort still installed. App Store login was confirmed on 7 November 2026 after restarting `itunesstored` so it loaded the Store tweak. App downloads remain unverified.
+
+The projects address different authentication paths: GSAPort handles iCloud authentication, and iTunesStoreX repairs Store URLs and the App Store authentication endpoint. We have not tested App Store login after removing GSAPort, so whether iTunesStoreX needs GSAPort for that login remains unknown. Keep both installed to reproduce the verified setup. The device also had `tlsfix` and CheckmateStore installed; their necessity was not tested independently.
+
+## About this fork
 
 An unofficial fork of [Epixx512/GSAPort](https://github.com/Epixx512/GSAPort), with compatibility changes for iOS 8. Credit for the original tweak and authentication implementation belongs to Pod and the upstream contributors.
 
