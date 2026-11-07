@@ -24,7 +24,15 @@ Download `com.podpod123.gsaport_2.4.2+ios8.4_iphoneos-arm.deb` from this fork's 
 dpkg -i com.podpod123.gsaport_2.4.2+ios8.4_iphoneos-arm.deb
 ```
 
-Respring after installation. For trusted-device two-factor authentication, enter your password first, then enter only the verification code in the password field when retrying, as required by upstream. SMS verification is unsupported. The original third-party anisette service remains a network dependency. To uninstall, remove GSAPort in Cydia or run `dpkg -r com.podpod123.gsaport`, then respring.
+Respring after installation, then sign in through **Settings → iCloud**:
+
+1. Enter your Apple Account email address and normal password, then tap Sign In.
+2. If sign-in fails, check another Apple device already signed into the same account for an approval prompt or six-digit verification code. The first attempt can display an incorrect-password error while GSAPort waits for two-factor verification.
+3. Keep your email address unchanged and replace the password with **only the six-digit verification code**, then tap Sign In again. Do not append the code to your password.
+
+If no prompt appears, manually generate a fresh verification code on a trusted device. This was necessary on the test setup. Keep Settings open between attempts; closing it or restarting the relevant processes can discard the pending verification state. SMS verification is unsupported.
+
+The original third-party anisette service remains a network dependency. To uninstall, remove GSAPort in Cydia or run `dpkg -r com.podpod123.gsaport`, then respring.
 
 To build, install [Theos](https://theos.dev/docs/installation), a toolchain that supports `armv7`, the iOS 9.3 SDK in `$THEOS/sdks/iPhoneOS9.3.sdk`, and ldid. With a complete iOS toolchain configured, run:
 
