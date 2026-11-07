@@ -1,15 +1,15 @@
-TARGET := iphone:clang:7.0:5.0
+TARGET := iphone:clang:9.3:8.0
 INSTALL_TARGET_PROCESSES = Preferences accountsd gamed FindMyiPhone FindMyFriends imagent
-ARCHS = armv7 armv7s arm64
+ARCHS = armv7
 
 
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = GSAPort
 
-GSAPort_FILES = Tweak.x polyfill.x
-GSAPort_CFLAGS = -fobjc-arc -isystem /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/6.0/include/ -Wno-gcc-compat -I$(THEOS_PROJECT_DIR)/openssl/include
+GSAPort_FILES = Tweak.x SessionSupport.x AccountDiagnostics.x
+GSAPort_CFLAGS = -fobjc-arc -Wno-gcc-compat -I$(THEOS_PROJECT_DIR)/openssl/include
 GSAPort_LDFLAGS = $(THEOS_PROJECT_DIR)/openssl/lib/libcrypto.a -framework IOKit -framework CFNetwork -lz
-GSAPort_FRAMEWORKS = UIKit
+GSAPort_FRAMEWORKS = UIKit Accounts
 
 include $(THEOS_MAKE_PATH)/tweak.mk

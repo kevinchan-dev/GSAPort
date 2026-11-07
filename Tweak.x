@@ -7,6 +7,24 @@
 #include <openssl/rand.h>
 #include <stdlib.h>
 #include <string.h>
+#import "RequestBody.h"
+
+// Log transport/status metadata only: never credentials, tokens, or response bodies.
+static void GSAPortLogTransport(NSString *stage, NSURLResponse *response, NSError *error) {
+    NSInteger status = [response isKindOfClass:[NSHTTPURLResponse class]] ? [(NSHTTPURLResponse *)response statusCode] : 0;
+    NSLog(@"[GSAPort][diagnostic] %@ HTTP=%ld errorDomain=%@ errorCode=%ld", stage, (long)status, error.domain ?: @"none", (long)error.code);
+}
+
+static void GSAPortLogStatus(NSString *stage, NSDictionary *response) {
+    NSDictionary *status = [response[@"Status"] isKindOfClass:[NSDictionary class]] ? response[@"Status"] : nil;
+    id ec = status[@"ec"];
+    id hsc = status[@"hsc"];
+    NSString *au = status[@"au"];
+    NSString *auth = [au isEqual:@"trustedDeviceSecondaryAuth"] ? @"trusted-device" : ([au isEqual:@"secondaryAuth"] ? @"secondary" : @"other-or-none");
+    NSLog(@"[GSAPort][diagnostic] %@ statusPresent=%d ec=%ld hsc=%ld auth=%@", stage, status != nil,
+          [ec respondsToSelector:@selector(integerValue)] ? (long)[ec integerValue] : 0,
+          [hsc respondsToSelector:@selector(integerValue)] ? (long)[hsc integerValue] : 0, auth);
+}
 
 static NSData *gunzipData(NSData *data) {
     if (!data || data.length < 2) return data;
@@ -31,6 +49,27 @@ static NSData *gunzipData(NSData *data) {
     if (status != Z_STREAM_END) return data;
     [output setLength:stream.total_out];
     return output;
+}
+
+static void GSAPortLogAccountResponse(NSString *stage, NSData *data) {
+    NSData *decoded = gunzipData(data);
+    NSError *parseError = nil;
+    id parsed = decoded ? [NSPropertyListSerialization propertyListWithData:decoded options:0 format:NULL error:&parseError] : nil;
+    if (!parsed && decoded) parsed = [NSJSONSerialization JSONObjectWithData:decoded options:0 error:NULL];
+    NSDictionary *body = [parsed isKindOfClass:[NSDictionary class]] ? parsed : nil;
+    NSLog(@"[GSAPort][diagnostic] %@ bytes=%lu dictionary=%d accountInfo=%d tokens=%d services=%d parseError=%ld",
+          stage, (unsigned long)data.length, body != nil, body[@"appleAccountInfo"] != nil,
+          body[@"tokens"] != nil, body[@"serviceData"] != nil, (long)parseError.code);
+    for (NSString *key in @[@"status", @"error", @"errorCode", @"statusCode"]) {
+        id value = body[key];
+        if ([value isKindOfClass:[NSNumber class]]) NSLog(@"[GSAPort][diagnostic] %@ %@=%ld", stage, key, (long)[value integerValue]);
+    }
+    // Classify known compatibility errors without printing server-provided text.
+    NSString *description = body.description;
+    for (NSString *marker in @[@"unsupported os", @"unsupported operating system", @"terms and conditions", @"unsupported device"]) {
+        if (description && [description rangeOfString:marker options:NSCaseInsensitiveSearch].location != NSNotFound)
+            NSLog(@"[GSAPort][diagnostic] %@ marker=%@", stage, marker);
+    }
 }
 
 static NSData *sendRequestFreshConnection(NSURLRequest *request, NSURLResponse **outResponse, NSError **outError) {
@@ -360,7 +399,7 @@ static NSDictionary *fetchAnisetteFresh(void) {
     CFStringRef uuidCf = (CFStringRef)IORegistryEntryCreateCFProperty(platformExpert, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0);
     NSString *deviceUuid = (__bridge_transfer NSString *)uuidCf;
     IOObjectRelease(platformExpert);
-    NSLog(@"[GSAPort] getting anisette; uuid is %@", deviceUuid);
+    NSLog(@"[GSAPort] requesting anisette");
     uint32_t t = (uint32_t)([[NSDate date] timeIntervalSince1970] + 90.0);
     uint8_t tbytes[4] = {(uint8_t)(t & 0xFF), (uint8_t)((t >> 8) & 0xFF), (uint8_t)((t >> 16) & 0xFF), (uint8_t)((t >> 24) & 0xFF)};
     NSString *hostAndPath = [NSString stringWithFormat:@"icloud.podpod123.com/anisette.php?%@", deviceUuid];
@@ -391,6 +430,7 @@ static NSDictionary *fetchAnisetteFresh(void) {
     NSURLResponse *anisetteResponse = nil;
     NSError *anisetteError = nil;
     NSData *anisetteData = [NSURLConnection sendSynchronousRequest:anisetteReq returningResponse:&anisetteResponse error:&anisetteError];
+    GSAPortLogTransport(@"anisette", anisetteResponse, anisetteError);
     return (anisetteData && !anisetteError) ? [NSJSONSerialization JSONObjectWithData:anisetteData options:0 error:nil] : nil;
 }
 
@@ -451,7 +491,14 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
 - (void)startLoading {
     if (!pendingTwoFactor) pendingTwoFactor = [NSMutableDictionary dictionary];
 
-    NSURLRequest *request = self.request;
+    BOOL hadBodyStream = self.request.HTTPBodyStream != nil;
+    NSError *bodyError = nil;
+    NSURLRequest *request = GSAPortRequestWithBody(self.request, &bodyError);
+    if (!request) {
+        NSLog(@"[GSAPort][diagnostic] request body read failed domain=%@ code=%ld", bodyError.domain, (long)bodyError.code);
+        [self.client URLProtocol:self didFailWithError:bodyError];
+        return;
+    }
     NSString *path = request.URL.path;
     NSString *host = request.URL.host;
     BOOL isICloudLogin = [host isEqualToString:@"setup.icloud.com"] && [path isEqualToString:@"/setup/login_or_create_account"];
@@ -464,7 +511,9 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
     BOOL isFMFGeneric = [host hasSuffix:@"fmfmobile.icloud.com"];
     BOOL isAccountSettingsDirect = [host isEqualToString:@"setup.icloud.com"] && [path isEqualToString:@"/setup/get_account_settings"];
     BOOL isBrokenAuthenticateURL = [host isEqualToString:@"setup.icloud.com"] && [path isEqualToString:@"/setup/authenticate/$APPLE_ID$"];
-    NSLog(@"[GSAPort] url: %@", request.URL.absoluteString);
+    NSLog(@"[GSAPort] intercepted host=%@ route=%@", request.URL.host,
+          isAccountSettingsDirect ? @"account-settings" : (isICloudLogin ? @"iCloud-login" : (isLoginDelegates ? @"login-delegates" : (isBrokenAuthenticateURL ? @"authenticate-placeholder" : @"other"))));
+    NSLog(@"[GSAPort][diagnostic] request body bytes=%lu wasStream=%d", (unsigned long)request.HTTPBody.length, hadBodyStream);
 
     if (isFMFGeneric) {
         NSOperationQueue *fmfQueue = [[NSOperationQueue alloc] init];
@@ -548,6 +597,8 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSURLResponse *responseAS = nil;
             NSError *errorAS = nil;
             NSData *dataAS = [NSURLConnection sendSynchronousRequest:reqAS returningResponse:&responseAS error:&errorAS];
+            GSAPortLogTransport(@"accountsd account settings", responseAS, errorAS);
+            GSAPortLogAccountResponse(@"accountsd account settings", dataAS);
             NSHTTPURLResponse *httpResponseAS = (NSHTTPURLResponse *)responseAS;
             if (!httpResponseAS && dataAS) {
                 httpResponseAS = [[NSHTTPURLResponse alloc] initWithURL:request.URL statusCode:200 HTTPVersion:@"HTTP/1.1" headerFields:@{}];
@@ -656,12 +707,20 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             }
         }
     } else {
-        NSDictionary *bodyDict = [NSPropertyListSerialization propertyListWithData:originalBody options:0 format:NULL error:nil];
+        id parsedBody = originalBody ? [NSPropertyListSerialization propertyListWithData:originalBody options:0 format:NULL error:nil] : nil;
+        if (!parsedBody && originalBody) {
+            parsedBody = [NSJSONSerialization JSONObjectWithData:originalBody options:0 error:nil];
+            if ([parsedBody isKindOfClass:[NSDictionary class]]) {
+                originalBody = [NSPropertyListSerialization dataWithPropertyList:parsedBody format:NSPropertyListXMLFormat_v1_0 options:0 error:nil];
+            }
+        }
+        NSDictionary *bodyDict = [parsedBody isKindOfClass:[NSDictionary class]] ? parsedBody : nil;
         username = bodyDict[isLoginDelegates ? @"apple-id" : @"username"];
         submittedPassword = bodyDict[@"password"];
     }
 
     if (!username || !submittedPassword) {
+        NSLog(@"[GSAPort][diagnostic] request credentials missing usernamePresent=%d passwordPresent=%d bodyBytes=%lu", username != nil, submittedPassword != nil, (unsigned long)originalBody.length);
         NSHTTPURLResponse *response400 = [[NSHTTPURLResponse alloc] initWithURL:self.request.URL statusCode:400 HTTPVersion:@"HTTP/1.1" headerFields:@{}];
         [self.client URLProtocol:self didReceiveResponse:response400 cacheStoragePolicy:NSURLCacheStorageNotAllowed];
         [self.client URLProtocolDidFinishLoading:self];
@@ -748,6 +807,7 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSURLResponse *submitResponse = nil;
             NSError *submitError = nil;
             [NSURLConnection sendSynchronousRequest:submitReq returningResponse:&submitResponse error:&submitError];
+            GSAPortLogTransport(@"two-factor code validation", submitResponse, submitError);
             NSHTTPURLResponse *submitHttp = (NSHTTPURLResponse *)submitResponse;
 
             if (submitHttp.statusCode != 200) {
@@ -798,6 +858,8 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             sleep(7);
         }
         NSDictionary *initResp = initData ? [NSPropertyListSerialization propertyListWithData:initData options:0 format:NULL error:nil][@"Response"] : nil;
+        GSAPortLogTransport(@"GSA init", initResponse, initError);
+        GSAPortLogStatus(@"GSA init", initResp);
 
         if (!initResp || !initResp[@"sp"]) {
             srp_user_delete(usr);
@@ -867,6 +929,8 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             sleep(7);
         }
         NSDictionary *completeResp = completeData ? [NSPropertyListSerialization propertyListWithData:completeData options:0 format:NULL error:nil][@"Response"] : nil;
+        GSAPortLogTransport(@"GSA complete", completeResponse, completeError);
+        GSAPortLogStatus(@"GSA complete", completeResp);
 
         if (!completeResp) {
             srp_user_delete(usr);
@@ -938,6 +1002,7 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSString *identityToken2fa = base64_encode([combined2fa dataUsingEncoding:NSUTF8StringEncoding]);
 
             NSDictionary *triggerCpd = fetchAnisetteFresh();
+            NSLog(@"[GSAPort][diagnostic] requesting trusted-device code; identityPresent=%d anisettePresent=%d", dsid2fa.length > 0 && idmsToken2fa.length > 0, triggerCpd != nil);
 
             NSMutableURLRequest *triggerReq = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"https://gsa.apple.com/auth/verify/trusteddevice"]];
             [NSURLProtocol setProperty:@YES forKey:@"GSAPortHandled" inRequest:triggerReq];
@@ -953,6 +1018,7 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSURLResponse *triggerResponse = nil;
             NSError *triggerError = nil;
             [NSURLConnection sendSynchronousRequest:triggerReq returningResponse:&triggerResponse error:&triggerError];
+            GSAPortLogTransport(@"trusted-device code request", triggerResponse, triggerError);
             pendingTwoFactor[username] = @{@"password": realPassword, @"dsid": dsid2fa ?: @"", @"idmsToken": idmsToken2fa ?: @""};
             NSHTTPURLResponse *needCodeResponse = [[NSHTTPURLResponse alloc] initWithURL:self.request.URL statusCode:401 HTTPVersion:@"HTTP/1.1" headerFields:@{}];
             [self.client URLProtocol:self didReceiveResponse:needCodeResponse cacheStoragePolicy:NSURLCacheStorageNotAllowed];
@@ -1000,6 +1066,8 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSURLResponse *authResponse = nil;
             NSError *authError = nil;
             NSData *authData = [NSURLConnection sendSynchronousRequest:authReq returningResponse:&authResponse error:&authError];
+            GSAPortLogTransport(@"iCloud authenticate", authResponse, authError);
+            GSAPortLogAccountResponse(@"iCloud authenticate", authData);
 
             NSString *dsid = nil;
             NSString *mmeAuthToken = nil;
@@ -1033,6 +1101,8 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSURLResponse *settingsResponse = nil;
             NSError *settingsError = nil;
             NSData *settingsData = [NSURLConnection sendSynchronousRequest:settingsReq returningResponse:&settingsResponse error:&settingsError];
+            GSAPortLogTransport(@"iCloud account settings", settingsResponse, settingsError);
+            GSAPortLogAccountResponse(@"iCloud account settings", settingsData);
             NSHTTPURLResponse *settingsHttp = (NSHTTPURLResponse *)settingsResponse;
 
             if (!settingsData) {
@@ -1069,6 +1139,8 @@ static NSMutableURLRequest *buildForwardedRequest(NSURL *url, NSString *method, 
             NSURLResponse *response = nil;
             NSError *error = nil;
             NSData *data = [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
+            GSAPortLogTransport(@"login delegates", response, error);
+            GSAPortLogAccountResponse(@"login delegates", data);
             NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
             if (!httpResponse && data) {
                 httpResponse = [[NSHTTPURLResponse alloc] initWithURL:req.URL statusCode:200 HTTPVersion:@"HTTP/1.1" headerFields:@{}];
