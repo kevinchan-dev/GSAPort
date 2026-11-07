@@ -1,12 +1,12 @@
-# GSAPort — iOS 8 fork
+# GSAPort — iOS 8.4.1 (experimental build 4)
 
-**Tested and verified: iCloud sign-in on a jailbroken iPad 4 running iOS 8.4.1**, using GSAPort `2.4.2+ios8.4`, including a manually generated trusted-device verification code. This verifies account sign-in; individual iCloud services and other devices or iOS versions have not all been tested.
+**Tested and verified: iCloud sign-in on a jailbroken iPad 4 running iOS 8.4.1**, using GSAPort build 4 (now packaged as `2.4.2+ios8.4.1-4`), including a manually generated trusted-device verification code. This verifies account sign-in; individual iCloud services and other devices or iOS versions have not all been tested.
 
 ## Relationship to iTunesStoreX
 
 GSAPort restored iCloud sign-in on the test device **before iTunesStoreX was installed**, so iTunesStoreX was not needed for that successful iCloud login. App Store login still failed with GSAPort alone.
 
-[The iOS 8 iTunesStoreX fork](https://github.com/kevinchan-dev/iTunesStoreX) (now packaged as `3.1+ios8.4.1-1` with the same tested tweak binary) restored App Store sign-in on the same iPad, with GSAPort still installed. App Store login was confirmed on 7 November 2026 after restarting `itunesstored` so it loaded the Store tweak. App downloads remain unverified.
+[The iOS 8.4.1 iTunesStoreX fork](https://github.com/kevinchan-dev/iTunesStoreX) (now packaged as `3.1+ios8.4.1-1` with the same tested tweak binary) restored App Store sign-in on the same iPad, with GSAPort still installed. App Store login was confirmed on 7 November 2026 after restarting `itunesstored` so it loaded the Store tweak. App downloads remain unverified.
 
 The projects address different authentication paths: GSAPort handles iCloud authentication, and iTunesStoreX repairs Store URLs and the App Store authentication endpoint. We have not tested App Store login after removing GSAPort, so whether iTunesStoreX needs GSAPort for that login remains unknown. Keep both installed to reproduce the verified setup. The device also had `tlsfix` and CheckmateStore installed; their necessity was not tested independently.
 
@@ -14,14 +14,16 @@ The projects address different authentication paths: GSAPort handles iCloud auth
 
 An unofficial fork of [Epixx512/GSAPort](https://github.com/Epixx512/GSAPort), with compatibility changes for iOS 8. Credit for the original tweak and authentication implementation belongs to Pod and the upstream contributors.
 
-This checkout now builds an **experimental iPad 4 / iOS 8 package**. The upstream description below describes the original release. The local changes add `GSAPortProtocol` to default and ephemeral `NSURLSession` configurations and explicit session factory calls, build only `armv7`, and restrict installation to iOS 8.x. iCloud sign-in was confirmed on a jailbroken iPad 4 running iOS 8.4.1 with build `2.4.2+ios8.4`, including a manually generated trusted-device verification code. Individual iCloud services have not all been tested. Background sessions cannot use custom URL protocols, and existing/shared session interception and iOS 8 endpoint differences still require device testing. This project does not intercept App Store sign-in endpoints.
+This checkout now builds an **experimental iPad 4 / iOS 8 package**. The upstream description below describes the original release. The local changes add `GSAPortProtocol` to default and ephemeral `NSURLSession` configurations and explicit session factory calls, build only `armv7`, and restrict installation to iOS 8.x. iCloud sign-in was confirmed on a jailbroken iPad 4 running iOS 8.4.1 with functional build 4 (now packaged as `2.4.2+ios8.4.1-4`), including a manually generated trusted-device verification code. Individual iCloud services have not all been tested. Background sessions cannot use custom URL protocols, and existing/shared session interception and iOS 8 endpoint differences still require device testing. This project does not intercept App Store sign-in endpoints.
+
+The package version `2.4.2+ios8.4.1-4` means upstream GSAPort `2.4.2`, tested iOS **8.4.1**, and fork **build 4**. The release tag is `v2.4.2-ios8.4.1-build4`. This naming correction changes package metadata only; the compiled tweak is identical to the existing build 4 release.
 
 The current build also reads streamed request bodies and accepts JSON credentials in addition to property lists. Its diagnostic logging records HTTP status and numeric authentication errors without logging credentials, verification codes, tokens, or response bodies.
 
-Download `com.podpod123.gsaport_2.4.2+ios8.4_iphoneos-arm.deb` from this fork's [GitHub Releases](../../releases). It is a 32-bit ARM build for a traditional (rootful) iOS 8 jailbreak and requires Cydia Substrate (`mobilesubstrate`). It retains the upstream package identifier and replaces an existing GSAPort installation. Copy it to the iPad, then install with Filza/iFile or run this command as root in the directory containing the file:
+Download `com.podpod123.gsaport_2.4.2+ios8.4.1-4_iphoneos-arm.deb` from this fork's [GitHub Releases](../../releases). It is a 32-bit ARM build for a traditional (rootful) iOS 8 jailbreak and requires Cydia Substrate (`mobilesubstrate`). It retains the upstream package identifier and replaces an existing GSAPort installation. Copy it to the iPad, then install with Filza/iFile or run this command as root in the directory containing the file:
 
 ```sh
-dpkg -i com.podpod123.gsaport_2.4.2+ios8.4_iphoneos-arm.deb
+dpkg -i com.podpod123.gsaport_2.4.2+ios8.4.1-4_iphoneos-arm.deb
 ```
 
 Respring after installation, then sign in through **Settings → iCloud**:

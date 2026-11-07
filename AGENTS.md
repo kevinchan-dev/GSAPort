@@ -5,7 +5,7 @@ These instructions apply throughout this repository. Read `README.md` for the cu
 ## Scope and compatibility
 
 - This is an unofficial iOS 8 fork of Epixx512/GSAPort. Preserve upstream attribution and history.
-- The verified setup is a jailbroken iPad 4 running iOS 8.4.1 with Cydia Substrate. iCloud sign-in was confirmed with package `2.4.2+ios8.4`; individual services, downloads, and other devices are not automatically verified by that result.
+- The verified setup is a jailbroken iPad 4 running iOS 8.4.1 with Cydia Substrate. iCloud sign-in was confirmed with functional build 4 (now packaged as `2.4.2+ios8.4.1-4`, with the same compiled tweak); individual services, downloads, and other devices are not automatically verified by that result.
 - GSAPort handles iCloud authentication. The separate iTunesStoreX fork handles Store compatibility. Consult the README for the combined test results; do not claim either tweak is independently sufficient for App Store login without testing that configuration.
 - Target traditional rootful packaging, `armv7`, and an iOS 8.0 deployment minimum. The Makefile uses the iOS 9.3 SDK. Do not introduce newer runtime APIs, architectures, or rootless paths without an explicit change in scope.
 
@@ -62,6 +62,7 @@ The README records the SDK/linker-stub corrections needed on the original build 
 
 ## Commits and publication
 
+- Keep OS versions separate from build revisions: package versions use `<upstream>+ios<tested-os>-<build>` (currently `2.4.2+ios8.4.1-4`), and tags use `v<upstream>-ios<tested-os>-build<build>` (currently `v2.4.2-ios8.4.1-build4`). Never encode a build revision as part of the OS version.
 - Check `git status` before editing and preserve unrelated work. Keep source, package metadata, and documentation consistent; do not bump the package version for documentation-only edits.
 - Commit locally when requested. A request to commit does not authorize pushing, publishing releases, or uploading artifacts. Wait for the user's explicit publication instruction, including completion of any requested review.
 - `origin` is the user's fork; `upstream` is Epixx512/GSAPort. Do not push to upstream or rewrite published history as part of routine work.

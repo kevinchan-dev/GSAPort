@@ -1,8 +1,8 @@
 Package: com.podpod123.gsaport
-Name: GSAPort (iOS 8 Experimental)
-Version: 2.4.2+ios8.4
+Name: GSAPort (iOS 8.4.1 Experimental)
+Version: 2.4.2+ios8.4.1-4
 Architecture: iphoneos-arm
-Description: Experimental iOS 8 build with NSURLSession protocol registration. iCloud sign-in tested on iPad 4 with iOS 8.4.1; App Store sign-in is not covered. After receiving a trusted-device verification code, enter ONLY the code in the password field. SMS verification is not supported.
+Description: Experimental build 4 with NSURLSession protocol registration. iCloud sign-in tested on iPad 4 with iOS 8.4.1; App Store sign-in is not covered. After receiving a trusted-device verification code, enter ONLY the code in the password field. SMS verification is not supported.
 Maintainer: Pod <pod@podpod123.com>
 Author: Pod <pod@podpod123.com>
 Section: Tweaks
