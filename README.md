@@ -6,7 +6,7 @@
 
 GSAPort restored iCloud sign-in on the test device **before iTunesStoreX was installed**, so iTunesStoreX was not needed for that successful iCloud login. App Store login still failed with GSAPort alone.
 
-[The iOS 8 iTunesStoreX fork](https://github.com/kevinchan-dev/iTunesStoreX) `3.1+ios8.1` subsequently restored App Store sign-in on the same iPad, with GSAPort still installed. App Store login was confirmed on 7 November 2026 after restarting `itunesstored` so it loaded the Store tweak. App downloads remain unverified.
+[The iOS 8 iTunesStoreX fork](https://github.com/kevinchan-dev/iTunesStoreX) (now packaged as `3.1+ios8.4.1-1` with the same tested tweak binary) restored App Store sign-in on the same iPad, with GSAPort still installed. App Store login was confirmed on 7 November 2026 after restarting `itunesstored` so it loaded the Store tweak. App downloads remain unverified.
 
 The projects address different authentication paths: GSAPort handles iCloud authentication, and iTunesStoreX repairs Store URLs and the App Store authentication endpoint. We have not tested App Store login after removing GSAPort, so whether iTunesStoreX needs GSAPort for that login remains unknown. Keep both installed to reproduce the verified setup. The device also had `tlsfix` and CheckmateStore installed; their necessity was not tested independently.
 
